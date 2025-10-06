@@ -123,14 +123,19 @@ GO
 ---------Core.tr_NoSelfMessage---------
 CREATE OR ALTER TRIGGER Core.tr_NoSelfMessage
 ON Core.Messages
-FOR INSERT
+AFTER INSERT
 AS
 BEGIN
-  IF EXISTS (SELECT 1 FROM Inserted WHERE SenderID = ReceiverID)
+  SET NOCOUNT ON;
+  IF EXISTS (
+    SELECT 1
+    FROM Inserted
+    WHERE SenderID = ReceiverID
+  )
   BEGIN
-    RAISERROR('User cannot send message to themselves',16,1);
-    ROLLBACK TRANSACTION;
-    END
+  ROLLBACK TRANSACTION;
+  THROW 50011, 'User cannot send message to themselves', 1;
+  END
 END;
 GO
 ---------Core.tr_NoSelfMessage---------
@@ -143,7 +148,7 @@ BEGIN
     LogID INT IDENTITY PRIMARY KEY,
     CommentID INT,
     UserID INT,
-    CreatedAt DATETIME2 DEFAULT SYSUTCDATETIME()
+    CreatedAt DATETIME2 DEFAULT GETDATE()
   );
 END;
 GO
@@ -166,12 +171,17 @@ ON Core.Posts
 FOR INSERT, UPDATE
 AS
 BEGIN
-  IF EXISTS (SELECT 1 FROM Inserted WHERE (Content IS NULL OR LTRIM(RTRIM(Content))=''))
+  SET NOCOUNT ON;
+  IF EXISTS (
+    SELECT 1
+    FROM Inserted
+    WHERE (Content IS NULL OR LTRIM(RTRIM(Content)) = '')
+  )
   BEGIN
-  RAISERROR ('Post content cannot be empty',16,1);
-  ROLLBACK TRANSACTION;
-  END
-END;
+    ROLLBACK TRANSACTION;
+    THROW 50012, 'Post content cannot be empty', 1;
+    END
+  END;
 GO
 ---------Core.tr_NoEmptyContent---------
 ---------TRIGGERS---------
