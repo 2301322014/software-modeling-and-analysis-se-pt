@@ -136,6 +136,16 @@ CREATE TABLE dbo.factMessages
 GO
 ---------factMessages---------
 
+---------factUserComminities---------
+CREATE TABLE dbo.factUserCommunities (
+    user_community_key INT PRIMARY KEY IDENTITY(1,1),
+    user_key INT NOT NULL,
+    community_key INT NOT NULL,
+    joined_at DATE,
+    is_admin BIT
+);
+---------factUserComminities---------
+
 ---------factSavedPosts---------
 CREATE TABLE dbo.factSavedPosts
 (
@@ -165,15 +175,15 @@ DECLARE @end_date   DATE = DATEADD(DAY, 365, CAST(GETDATE() AS DATE));
 INSERT INTO dbo.dimDate
   (date_key, full_date, [year], [quarter], [month], month_name, [day], day_of_week, week_of_year, is_weekend)
 SELECT
-  (YEAR(d.d) * 10000) + (MONTH(d.d) * 100) + DAY(d.d)          AS date_key,     -- по-бързо и без FORMAT()
-  d.d                                                          AS full_date,
-  YEAR(d.d)                                                    AS [year],
-  DATEPART(QUARTER, d.d)                                       AS [quarter],
-  MONTH(d.d)                                                   AS [month],
-  DATENAME(MONTH, d.d)                                         AS month_name,
-  DAY(d.d)                                                     AS [day],
-  ((DATEPART(WEEKDAY, d.d) + 6) % 7) + 1                       AS day_of_week,   -- 1..7 (Mon..Sun)
-  DATEPART(ISO_WEEK, d.d)                                      AS week_of_year,  -- ISO седмица
+  (YEAR(d.d) * 10000) + (MONTH(d.d) * 100) + DAY(d.d) AS date_key,     -- по-бързо и без FORMAT()
+  d.d AS full_date,
+  YEAR(d.d) AS [year],
+  DATEPART(QUARTER, d.d) AS [quarter],
+  MONTH(d.d) AS [month],
+  DATENAME(MONTH, d.d) AS month_name,
+  DAY(d.d) AS [day],
+  ((DATEPART(WEEKDAY, d.d) + 6) % 7) + 1 AS day_of_week,   -- 1..7 (Mon..Sun)
+  DATEPART(ISO_WEEK, d.d) AS week_of_year,  -- ISO седмица
   CASE WHEN ((DATEPART(WEEKDAY, d.d) + 6) % 7) + 1 IN (6, 7) THEN 1 ELSE 0 END AS is_weekend
 FROM d
 OPTION (MAXRECURSION 0);
@@ -195,11 +205,11 @@ BEGIN TRY
   DELETE FROM dbo.dimPostType;
   DELETE FROM dbo.dimCommunity;
 
-  DBCC CHECKIDENT ('dbo.dimUser',       RESEED, 0);
-  DBCC CHECKIDENT ('dbo.dimPostType',   RESEED, 0);
-  DBCC CHECKIDENT ('dbo.dimCommunity',  RESEED, 0);
-  DBCC CHECKIDENT ('dbo.dimPost',       RESEED, 0);
-  DBCC CHECKIDENT ('dbo.dimContentItem',RESEED, 0);
+  DBCC CHECKIDENT ('dbo.dimUser', RESEED, 0);
+  DBCC CHECKIDENT ('dbo.dimPostType', RESEED, 0);
+  DBCC CHECKIDENT ('dbo.dimCommunity', RESEED, 0);
+  DBCC CHECKIDENT ('dbo.dimPost', RESEED, 0);
+  DBCC CHECKIDENT ('dbo.dimContentItem', RESEED, 0);
 
 ---------Re-load dims---------
   INSERT INTO dbo.dimUser (source_user_id, username, gender)
@@ -275,6 +285,17 @@ BEGIN TRY
   JOIN dbo.dimUser dur ON dur.source_user_id = m.ReceiverID
   JOIN dbo.dimDate dd  ON dd.full_date = CAST(m.SentAt AS DATE);
 
+  INSERT INTO dbo.factUserCommunities (user_key, community_key, joined_at, is_admin)
+  VALUES 
+  (1, 1, '2024-01-05', 1),
+  (2, 1, '2024-01-10', 0),
+  (3, 2, '2024-02-15', 0),
+  (1, 2, '2024-02-20', 1),
+  (4, 3, '2024-03-01', 0),
+  (2, 3, '2024-03-03', 0),
+  (5, 1, '2024-01-20', 0),
+  (5, 2, '2024-03-25', 1);
+
   INSERT INTO dbo.factSavedPosts (saver_user_key, post_key, saved_date_key, save_count)
   SELECT
     du.user_key,
@@ -304,6 +325,7 @@ SELECT 'dimContentItem', COUNT(*) FROM dbo.dimContentItem UNION ALL
 SELECT 'factPosts', COUNT(*) FROM dbo.factPosts UNION ALL
 SELECT 'factComments', COUNT(*) FROM dbo.factComments UNION ALL
 SELECT 'factMessages', COUNT(*) FROM dbo.factMessages UNION ALL
+SELECT 'factUserCommunities', COUNT(*) FROM dbo.factUserCommunities;
 SELECT 'factSavedPosts', COUNT(*) FROM dbo.factSavedPosts;
 PRINT 'XDW build & load complete.';
 ---------6)Quick sanity checks---------
